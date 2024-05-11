@@ -1,6 +1,7 @@
 import os
 import copy
 from typing import List
+import uuid
 
 class Cell():
     def __init__(self):
@@ -8,6 +9,10 @@ class Cell():
         self.city = None
         self.units = []
         self.visible = True
+        self.uuid = uuid.uuid4()
+
+    def __eq__(self, other):
+        return self.uuid == other.uuid
 
 class Unit():
     movement = 1
@@ -15,6 +20,10 @@ class Unit():
     vision = 1
     def __init__(self, player):
         self.player = player
+        self.uuid = uuid.uuid4()
+    
+    def __eq__(self, other):
+        return self.uuid == other.uuid
 
 def clear_console():
     os.system('cls' if os.name=='nt' else 'clear')
@@ -115,8 +124,8 @@ def print_player_view(board, player):
 
 def get_cell_position(board: List[List[Cell]], cell: Cell):
     for row_index, row in enumerate(board):
-        for column_index, cell in enumerate(row):
-            if cell == cell:
+        for column_index, current_cell in enumerate(row):
+            if current_cell == cell:
                 return row_index, column_index
     raise ValueError("Cell not found on board")
 
@@ -139,8 +148,8 @@ def get_cell_control(board: List[List[Cell]], cell: Cell) -> tuple[int, int]:
     cells_to_check = [cell]
     adjacent_cells = get_adjacent_cells(board, cell)
     cells_to_check.extend(adjacent_cells)
-    for cell in cells_to_check:
-        for unit in cell.units:
+    for current_cell in cells_to_check:
+        for unit in current_cell.units:
             if unit.player == 1:
                 player_1_control += unit.control
             else:
@@ -189,10 +198,13 @@ def get_unit_cell(board: List[List[Cell]], unit: Unit):
     return None
 
 def add_unit(board: List[List[Cell]], unit: Unit, row: int, column: int):
+    if row < 0 or row > 8 or column < 0 or column > 8:
+        print("Invalid unit placement, unit cannot be added off grid.")
+        raise ValueError("Unit cannot be placed outside the board")
     cell = board[row][column]
-    if cell.type == "lake":
-        print("Invalid coordinates, unit cannot be placed on lake. Exiting...")
-        raise ValueError("Unit cannot be placed on lake")
+    if cell.type == "lake" or cell.type == "mountain":
+        print("Invalid coordinates, unit cannot be placed on lake.")
+        raise ValueError("Unit cannot be placed on lake or mountain")
     player = unit.player
     player_units = get_player_units(board, player)
     if len(player_units) == 7:
@@ -202,9 +214,18 @@ def add_unit(board: List[List[Cell]], unit: Unit, row: int, column: int):
 def move_unit(board: List[List[Cell]], unit: Unit, end_row: int, end_column: int):
     starting_cell = get_unit_cell(board, unit)
     if not starting_cell:
+        print("Unit not found on board")
         raise ValueError("Unit not found on board")
+    starting_row, starting_column = get_cell_position(board, starting_cell)
+    if abs(starting_row - end_row) +  abs(starting_column - end_column) > unit.movement:
+        print("Unit cannot move that far")
+        raise ValueError("Unit cannot move that far")
     starting_cell.units.remove(unit)
-    add_unit(board, unit, end_row, end_column)
+    try:
+        add_unit(board, unit, end_row, end_column)
+    except Exception as e:
+        add_unit(board, unit, starting_row, starting_column)
+        raise e
 
 board = [[Cell() for _ in range(9)] for _ in range(9)]
 board[4][4].type = "mountain"
@@ -305,19 +326,39 @@ add_unit(board, Unit(2), 0, 4)
 add_unit(board, Unit(2), 0, 5)
 add_unit(board, Unit(2), 0, 6)
 add_unit(board, Unit(2), 0, 7)
-print_board(board)
-print_player_view(board, 1)
-print_player_view(board, 2)
-print(get_cell_control(board, board[8][3]))
-# while True:
-#     clear_console()
-#     print_player_view(board, 1)
-#     for unit in get_player_units(board, 1):
-#         row,column = get_unit_position(board, unit)
-#         player_1_move = input(f"Enter move for unit at {row}, {column} in format row, column:")
-#         split_move = player_1_move.split(",")
-#         end_row = int(split_move[0])
-#         end_column = int(split_move[1])
-#         move_unit(board, unit, end_row, end_column)
+
+def player_turn(board: List[List[Cell]], player: int):
+    clear_console()
+    print_player_view(board, player)
+    units = get_player_units(board, player)
+    if player == 2:
+        units.reverse()
+    for unit in units:
+        while True:
+            row,column = get_unit_position(board, unit)
+            if player == 2:
+                row = 8 - row
+                column = 8 - column
+            player_move = input(f"{player}, Enter move for unit at {row}, {column} in format row, column, or enter to skip:")
+            if not player_move:
+                break
+            split_move = player_move.split(",")
+            end_row = int(split_move[0])
+            end_column = int(split_move[1])
+            if player == 2:
+                end_row = 8 - end_row
+                end_column = 8 - end_column
+            try:
+                move_unit(board, unit, end_row, end_column)
+            except:
+                print("Invalid move, please try again.")
+                continue
+            break
+        clear_console()
+        print_player_view(board, player)
+
+while True:
+    player_turn(board, 1)
+    player_turn(board, 2)
 
         
