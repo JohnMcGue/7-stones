@@ -227,12 +227,14 @@ def move_unit(board: List[List[Cell]], unit: Unit, end_row: int, end_column: int
         add_unit(board, unit, starting_row, starting_column)
         raise e
 
-board = [[Cell() for _ in range(9)] for _ in range(9)]
-board[4][4].type = "mountain"
-board[2][2].type = "forest"
-board[6][6].type = "forest"
-board[2][6].type = "lake"
-board[6][2].type = "lake"
+def create_standard_board() -> List[List[Cell]]:
+    board = [[Cell() for _ in range(9)] for _ in range(9)]
+    board[4][4].type = "mountain"
+    board[2][2].type = "forest"
+    board[6][6].type = "forest"
+    board[2][6].type = "lake"
+    board[6][2].type = "lake"
+    return board
 
 def place_cities(board):
     # Call the function with the board
@@ -308,24 +310,6 @@ def place_units(board):
             clear_console()
             print_player_view(board, 2)
             break
-# place test cities
-board[6][4].city = 1
-board[2][4].city = 2
-# place test units
-add_unit(board, Unit(1), 7, 4)
-add_unit(board, Unit(1), 7, 5)
-add_unit(board, Unit(1), 7, 6)
-add_unit(board, Unit(1), 8, 4)
-add_unit(board, Unit(1), 8, 5)
-add_unit(board, Unit(1), 8, 6)
-add_unit(board, Unit(1), 8, 7)
-add_unit(board, Unit(2), 1, 4)
-add_unit(board, Unit(2), 1, 5)
-add_unit(board, Unit(2), 1, 6)
-add_unit(board, Unit(2), 0, 4)
-add_unit(board, Unit(2), 0, 5)
-add_unit(board, Unit(2), 0, 6)
-add_unit(board, Unit(2), 0, 7)
 
 def player_turn(board: List[List[Cell]], player: int):
     clear_console()
@@ -357,8 +341,63 @@ def player_turn(board: List[List[Cell]], player: int):
         clear_console()
         print_player_view(board, player)
 
-while True:
-    player_turn(board, 1)
-    player_turn(board, 2)
+def remove_unit(board: List[List[Cell]], unit: Unit):
+    cell = get_unit_cell(board, unit)
+    cell.units.remove(unit)
+
+def resolve_board(board: List[List[Cell]]) -> int | None:
+    while True:
+        units_to_be_removed = []
+        for row in board:
+            for cell in row:
+                if cell.units:
+                    control_player, _ = get_cell_control(board, cell)
+                    for unit in cell.units:
+                        if unit.player != control_player:
+                            units_to_be_removed.append(unit)
+        if len(units_to_be_removed) == 0:
+            break
+        for unit in units_to_be_removed:
+            remove_unit(board, unit)
+    
+    winners = []
+    for row in board:
+        for cell in row:
+            if cell.city:
+                control_player, _ = get_cell_control(board, cell)
+                if control_player != cell.city:
+                    winners.append(control_player)
+    if len(winners) == 1:
+        print(f"Player {winners[0]} wins!")
+        return winners[0]
+    elif len(winners) == 2:
+        print("It's a draw!")
+        return 3
+    return None
+    
+if __name__ == "__main__":
+    board = create_standard_board()
+    # place test cities
+    board[6][4].city = 1
+    board[2][4].city = 2
+    # place test units
+    add_unit(board, Unit(1), 7, 4)
+    add_unit(board, Unit(1), 7, 5)
+    add_unit(board, Unit(1), 7, 6)
+    add_unit(board, Unit(1), 8, 4)
+    add_unit(board, Unit(1), 8, 5)
+    add_unit(board, Unit(1), 8, 6)
+    add_unit(board, Unit(1), 8, 7)
+    add_unit(board, Unit(2), 1, 4)
+    add_unit(board, Unit(2), 1, 5)
+    add_unit(board, Unit(2), 1, 6)
+    add_unit(board, Unit(2), 0, 4)
+    add_unit(board, Unit(2), 0, 5)
+    add_unit(board, Unit(2), 0, 6)
+    add_unit(board, Unit(2), 0, 7)
+    while True:
+        player_turn(board, 1)
+        player_turn(board, 2)
+        resolve_board(board)
 
         
