@@ -1,6 +1,7 @@
+from functools import cache
 import os
 import copy
-from typing import List
+from typing import List, Set, Tuple
 import uuid
 
 class Cell():
@@ -13,6 +14,9 @@ class Cell():
 
     def __eq__(self, other):
         return self.uuid == other.uuid
+    
+    def __hash__(self):
+        return hash(self.uuid)
 
 class Unit():
     movement = 1
@@ -24,6 +28,195 @@ class Unit():
     
     def __eq__(self, other):
         return self.uuid == other.uuid
+
+def get_cell_position(board: List[List[Cell]], cell: Cell):
+    for row_index, row in enumerate(board):
+        for column_index, current_cell in enumerate(row):
+            if current_cell == cell:
+                return row_index, column_index
+    raise ValueError("Cell not found on board")
+
+def get_adjacent_cells(board: List[List[Cell]], cell: Cell) -> Set[Cell]:
+    adjacent_cells = set()
+    row, column = get_cell_position(board, cell)
+    if row > 0:
+        adjacent_cells.add(board[row-1][column])
+    if row < len(board) - 1:
+        adjacent_cells.add(board[row+1][column])
+    if column > 0:
+        adjacent_cells.add(board[row][column-1])
+    if column < len(board[0]) - 1:
+        adjacent_cells.add(board[row][column+1])
+    return adjacent_cells
+
+def get_cells_adjacent_to_set(board: List[List[Cell]], cells: Set[Cell]) -> Set[Cell]:
+    adjacent_cells = set()
+    for cell in cells:
+        adjacent_cells.update(get_adjacent_cells(board, cell))
+    return adjacent_cells - cells 
+
+def get_cell_control(board: List[List[Cell]], cell: Cell) -> tuple[int, int]:
+    player_1_control = 0
+    player_2_control = 0
+    cells_to_check = [cell]
+    adjacent_cells = get_adjacent_cells(board, cell)
+    cells_to_check.extend(adjacent_cells)
+    for current_cell in cells_to_check:
+        for unit in current_cell.units:
+            if unit.player == 1:
+                player_1_control += unit.control
+            else:
+                player_2_control += unit.control
+    if player_1_control == 0 and player_2_control == 0:
+        return None
+    else:
+        return player_1_control - player_2_control
+
+def get_cell_visibility(board: List[List[Cell]], cell: Cell, player: int):
+    if cell.city == player:
+        return True
+    for unit in cell.units:
+        if unit.player == player:
+            return True
+    adjacent_cells = get_adjacent_cells(board, cell)
+    for adjacent_cell in adjacent_cells:
+        for unit in adjacent_cell.units:
+            if unit.player == player:
+                return True
+    return False
+
+def get_player_units(board: List[List[Cell]], player) -> List[Unit]:
+    units = []
+    for row in board:
+        for cell in row:
+            for unit in cell.units:
+                if unit.player == player:
+                    units.append(unit)
+    return units
+
+def get_unit_position(board: List[List[Cell]], unit):
+    for row_index, row in enumerate(board):
+        for column, cell in enumerate(row):
+            if unit in cell.units:
+                return row_index, column
+    return None
+            
+def get_unit_cell(board: List[List[Cell]], unit: Unit):
+    for row in board:
+        for cell in row:
+            if unit in cell.units:
+                return cell
+    return None
+
+def add_unit(board: List[List[Cell]], unit: Unit, row: int, column: int):
+    if row < 0 or row > 8 or column < 0 or column > 8:
+        print("Invalid unit placement, unit cannot be added off grid.")
+        raise ValueError("Unit cannot be placed outside the board")
+    cell = board[row][column]
+    if cell.type == "lake" or cell.type == "mountain":
+        print("Invalid coordinates, unit cannot be placed on lake.")
+        raise ValueError("Unit cannot be placed on lake or mountain")
+    player = unit.player
+    player_units = get_player_units(board, player)
+    if len(player_units) == 7:
+        raise ValueError("Player already has 7 units on the board")
+    cell.units.append(unit)
+
+def move_unit(board: List[List[Cell]], unit: Unit, end_row: int, end_column: int):
+    starting_cell = get_unit_cell(board, unit)
+    if not starting_cell:
+        print("Unit not found on board")
+        raise ValueError("Unit not found on board")
+    starting_row, starting_column = get_cell_position(board, starting_cell)
+    if abs(starting_row - end_row) +  abs(starting_column - end_column) > unit.movement:
+        print("Unit cannot move that far")
+        raise ValueError("Unit cannot move that far")
+    starting_cell.units.remove(unit)
+    try:
+        add_unit(board, unit, end_row, end_column)
+    except Exception as e:
+        add_unit(board, unit, starting_row, starting_column)
+        raise e
+
+def remove_unit(board: List[List[Cell]], unit: Unit):
+    cell = get_unit_cell(board, unit)
+    cell.units.remove(unit)
+
+def check_player_control(control_value: int, player: int) -> bool:
+    if control_value is None:
+        return False
+    return control_value > 0 if player == 1 else control_value < 0
+
+def check_player_controls_cell(board: List[List[Cell]], cell: Cell, player: int) -> bool:
+    control_value = get_cell_control(board, cell)
+    return check_player_control(control_value, player)
+
+def get_contiguous_controlled_or_contested_cells(board: List[List[int]], cell: Cell, player: int) -> Set[Cell]:
+    def controlled_or_contested(cell, player):
+        control_value = get_cell_control(board, cell)
+        return control_value == 0 or check_player_control(control_value, player)
+    
+    if controlled_or_contested(cell, player):
+        contiguous_cells = {cell}
+        while True:
+            new_cells = get_cells_adjacent_to_set(board, contiguous_cells)
+            contiguous_cells.update(new_cells)
+            if not any(controlled_or_contested(new_cell, player) for new_cell in new_cells):
+                break
+            
+        return contiguous_cells
+    else:
+        return set()
+
+def get_opposing_player(player: int) -> int:
+    return 1 if player == 2 else 2
+
+def check_for_freedom(board: List[List[Cell]], cell: Cell, player: int) -> bool:
+    opponent = get_opposing_player(player)
+    if check_player_controls_cell(board, cell, opponent):
+        return False
+    contiguous_cells = get_contiguous_controlled_or_contested_cells(board, cell, player)
+    adjacent_cells = get_cells_adjacent_to_set(board, contiguous_cells)
+    if all(check_player_controls_cell(board, adjacent_cell, opponent) for adjacent_cell in adjacent_cells):
+        return False
+    return True
+
+def resolve_units(board: List[List[Cell]]) -> int | None:
+    while True:
+        units_to_be_removed = []
+        for row in board:
+            for cell in row:
+                if cell.units:
+                    player_1_units = [unit for unit in cell.units if unit.player == 1]
+                    if len(player_1_units) > 0:
+                        if not check_for_freedom(board, cell, 1):
+                            for unit in player_1_units:
+                                units_to_be_removed.append(unit)
+                    player_2_units = [unit for unit in cell.units if unit.player == 2]
+                    if len(player_2_units) > 0:
+                        if not check_for_freedom(board, cell, 2):
+                            for unit in player_2_units:
+                                units_to_be_removed.append(unit)
+
+        if len(units_to_be_removed) == 0:
+            break
+        for unit in units_to_be_removed:
+            remove_unit(board, unit)
+    
+def check_for_winner(board: List[List[Cell]]) -> int | None:
+    winners = []
+    for row in board:
+        for cell in row:
+            if cell.city:
+                if not check_for_freedom(board, cell, cell.city):
+                    winners.append(get_opposing_player(cell.city))
+    if len(winners) == 1:
+        print(f"Player {winners[0]} wins!")
+        return winners[0]
+    elif len(winners) == 2:
+        print("It's a draw!")
+        return 3
+    return None
 
 def clear_console():
     os.system('cls' if os.name=='nt' else 'clear')
@@ -46,11 +239,17 @@ def print_board(board: List[List[Cell]]):
                     line += f"({unit.player})"
                 else:
                     line += ("   ")
-                control_player, control_value = get_cell_control(board, cell)
                 if cell.type == "mountain" or cell.type == "lake":
                     line += f"   "
                 else:
-                    line += f"{control_player}:{control_value}"
+                    control_value = get_cell_control(board, cell)
+                    if control_value is None:
+                        line += " N "
+                    else:
+                        if control_value < 0:
+                            line += f"{control_value} "
+                        else:
+                            line += f" {control_value} "
                 if len(cell.units) > 1:
                     unit = cell.units[1]
                     line += f"({unit.player})"
@@ -121,111 +320,6 @@ def print_player_view(board, player):
                     else:
                         cell.city = 1
     print_board(board_copy)
-
-def get_cell_position(board: List[List[Cell]], cell: Cell):
-    for row_index, row in enumerate(board):
-        for column_index, current_cell in enumerate(row):
-            if current_cell == cell:
-                return row_index, column_index
-    raise ValueError("Cell not found on board")
-
-def get_adjacent_cells(board: List[List[Cell]], cell: Cell):
-    adjacent_cells = []
-    row, column = get_cell_position(board, cell)
-    if row > 0:
-        adjacent_cells.append(board[row-1][column])
-    if row < len(board) - 1:
-        adjacent_cells.append(board[row+1][column])
-    if column > 0:
-        adjacent_cells.append(board[row][column-1])
-    if column < len(board[0]) - 1:
-        adjacent_cells.append(board[row][column+1])
-    return adjacent_cells
-
-def get_cell_control(board: List[List[Cell]], cell: Cell) -> tuple[int, int]:
-    player_1_control = 0
-    player_2_control = 0
-    cells_to_check = [cell]
-    adjacent_cells = get_adjacent_cells(board, cell)
-    cells_to_check.extend(adjacent_cells)
-    for current_cell in cells_to_check:
-        for unit in current_cell.units:
-            if unit.player == 1:
-                player_1_control += unit.control
-            else:
-                player_2_control += unit.control
-    if player_1_control > player_2_control:
-        return 1, player_1_control - player_2_control
-    elif player_2_control > player_1_control:
-        return 2, player_2_control - player_1_control
-    else:
-        return 0, 0
-
-def get_cell_visibility(board: List[List[Cell]], cell: Cell, player: int):
-    if cell.city == player:
-        return True
-    for unit in cell.units:
-        if unit.player == player:
-            return True
-    adjacent_cells = get_adjacent_cells(board, cell)
-    for adjacent_cell in adjacent_cells:
-        for unit in adjacent_cell.units:
-            if unit.player == player:
-                return True
-    return False
-
-def get_player_units(board: List[List[Cell]], player) -> List[Unit]:
-    units = []
-    for row in board:
-        for cell in row:
-            for unit in cell.units:
-                if unit.player == player:
-                    units.append(unit)
-    return units
-
-def get_unit_position(board: List[List[Cell]], unit):
-    for row_index, row in enumerate(board):
-        for column, cell in enumerate(row):
-            if unit in cell.units:
-                return row_index, column
-    return None
-            
-def get_unit_cell(board: List[List[Cell]], unit: Unit):
-    for row in board:
-        for cell in row:
-            if unit in cell.units:
-                return cell
-    return None
-
-def add_unit(board: List[List[Cell]], unit: Unit, row: int, column: int):
-    if row < 0 or row > 8 or column < 0 or column > 8:
-        print("Invalid unit placement, unit cannot be added off grid.")
-        raise ValueError("Unit cannot be placed outside the board")
-    cell = board[row][column]
-    if cell.type == "lake" or cell.type == "mountain":
-        print("Invalid coordinates, unit cannot be placed on lake.")
-        raise ValueError("Unit cannot be placed on lake or mountain")
-    player = unit.player
-    player_units = get_player_units(board, player)
-    if len(player_units) == 7:
-        raise ValueError("Player already has 7 units on the board")
-    cell.units.append(unit)
-
-def move_unit(board: List[List[Cell]], unit: Unit, end_row: int, end_column: int):
-    starting_cell = get_unit_cell(board, unit)
-    if not starting_cell:
-        print("Unit not found on board")
-        raise ValueError("Unit not found on board")
-    starting_row, starting_column = get_cell_position(board, starting_cell)
-    if abs(starting_row - end_row) +  abs(starting_column - end_column) > unit.movement:
-        print("Unit cannot move that far")
-        raise ValueError("Unit cannot move that far")
-    starting_cell.units.remove(unit)
-    try:
-        add_unit(board, unit, end_row, end_column)
-    except Exception as e:
-        add_unit(board, unit, starting_row, starting_column)
-        raise e
 
 def create_standard_board() -> List[List[Cell]]:
     board = [[Cell() for _ in range(9)] for _ in range(9)]
@@ -341,40 +435,6 @@ def player_turn(board: List[List[Cell]], player: int):
         clear_console()
         print_player_view(board, player)
 
-def remove_unit(board: List[List[Cell]], unit: Unit):
-    cell = get_unit_cell(board, unit)
-    cell.units.remove(unit)
-
-def resolve_board(board: List[List[Cell]]) -> int | None:
-    while True:
-        units_to_be_removed = []
-        for row in board:
-            for cell in row:
-                if cell.units:
-                    control_player, _ = get_cell_control(board, cell)
-                    for unit in cell.units:
-                        if unit.player != control_player:
-                            units_to_be_removed.append(unit)
-        if len(units_to_be_removed) == 0:
-            break
-        for unit in units_to_be_removed:
-            remove_unit(board, unit)
-    
-    winners = []
-    for row in board:
-        for cell in row:
-            if cell.city:
-                control_player, _ = get_cell_control(board, cell)
-                if control_player != cell.city:
-                    winners.append(control_player)
-    if len(winners) == 1:
-        print(f"Player {winners[0]} wins!")
-        return winners[0]
-    elif len(winners) == 2:
-        print("It's a draw!")
-        return 3
-    return None
-    
 if __name__ == "__main__":
     board = create_standard_board()
     # place test cities
@@ -398,6 +458,7 @@ if __name__ == "__main__":
     while True:
         player_turn(board, 1)
         player_turn(board, 2)
-        resolve_board(board)
+        resolve_units(board)
+        winner = check_for_winner(board)
 
         
