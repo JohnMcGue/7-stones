@@ -160,9 +160,10 @@ def get_contiguous_controlled_or_contested_cells(board: List[List[int]], cell: C
         contiguous_cells = {cell}
         while True:
             new_cells = get_cells_adjacent_to_set(board, contiguous_cells)
-            contiguous_cells.update(new_cells)
-            if not any(controlled_or_contested(new_cell, player) for new_cell in new_cells):
+            new_controlled_or_contested_cells = {new_cell for new_cell in new_cells if controlled_or_contested(new_cell, player)}
+            if not new_controlled_or_contested_cells:
                 break
+            contiguous_cells.update(new_controlled_or_contested_cells)
             
         return contiguous_cells
     else:
