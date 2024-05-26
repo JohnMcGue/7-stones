@@ -122,5 +122,46 @@ def test_unit_dies_when_surrounded_even_if_unit_square_is_neutral(board):
     cell = board[6][6]
     assert player_1_unit not in cell.units
 
-def test_cascading_deaths():
-    assert False
+# one unit's death triggers the death of another unit
+def test_cascading_deaths(board):
+    player_1_unit = grid.Unit(1)
+    grid.add_unit(board, player_1_unit, 6, 6)
+    player_1_unit_2 = grid.Unit(1)
+    grid.add_unit(board, player_1_unit_2, 6, 4)
+    grid.add_unit(board, grid.Unit(2), 5, 5)
+    grid.add_unit(board, grid.Unit(2), 5, 5)
+    grid.add_unit(board, grid.Unit(2), 7, 3)
+    grid.add_unit(board, grid.Unit(2), 7, 3)
+    grid.print_board(board)
+    grid.resolve_units(board)
+    assert player_1_unit in board[6][6].units
+    assert player_1_unit_2 in board[6][4].units
+    grid.add_unit(board, grid.Unit(2), 6, 7)
+    grid.add_unit(board, grid.Unit(2), 6, 7)
+    grid.resolve_units(board)
+    assert player_1_unit not in board[6][6].units
+    assert player_1_unit_2 not in board[6][4].units
+
+def test_player_2_win(board):
+    board[6][6].city = 1
+    grid.add_unit(board, grid.Unit(2), 6, 7)
+    winner = grid.check_for_winner(board)
+    assert winner == 2
+
+def test_player_1_win(board):
+    board[6][6].city = 2
+    grid.add_unit(board, grid.Unit(1), 6, 6)
+    winner = grid.check_for_winner(board)
+    assert winner == 1
+
+def test_draw(board):
+    board[6][6].city = 1
+    grid.add_unit(board, grid.Unit(2), 6, 6)
+    board[3][3].city = 2
+    grid.add_unit(board, grid.Unit(1), 3, 3)
+    winner = grid.check_for_winner(board)
+    assert winner == 3
+
+def test_game_not_over(board):
+    winner = grid.check_for_winner(board)
+    assert winner is None

@@ -212,10 +212,8 @@ def check_for_winner(board: List[List[Cell]]) -> int | None:
                 if not check_for_freedom(board, cell, cell.city):
                     winners.append(get_opposing_player(cell.city))
     if len(winners) == 1:
-        print(f"Player {winners[0]} wins!")
         return winners[0]
     elif len(winners) == 2:
-        print("It's a draw!")
         return 3
     return None
 
@@ -231,7 +229,7 @@ def print_board(board: List[List[Cell]]):
     print(horizontal_separator)
 
     # Print each row
-    for row in board:
+    for index,row in enumerate(board):
         line = "|"
         for cell in row:
             if cell.visible:
@@ -265,7 +263,7 @@ def print_board(board: List[List[Cell]]):
             new_line = ""
             # Check if the current cell is the middle cell for the "mountain"
             if cell.type == "mountain":
-                cell_content = "    ^    "
+                cell_content = "   ^^^   "
             elif cell.type == "forest":
                 cell_content = "   ) (   "
             elif cell.type == "lake":
@@ -280,19 +278,18 @@ def print_board(board: List[List[Cell]]):
             line += new_line
         print(line)
         line = "|"
-        for cell in row:
+        for cell_index,cell in enumerate(row):
             if cell.visible:
                 if len(cell.units) == 3:
                     unit = cell.units[2]
-                    line += f"({unit.player})      " + "|"
+                    line += f"({unit.player})   {index},{cell_index}" + "|"
                 elif len(cell.units) > 3:
                     unit_1 = cell.units[2]
-                    unit_2 = cell.units[3]
-                    line += f"({unit_1.player})   ({unit_2.player})" + "|"
+                    line += f"({unit_1.player})   {index},{cell_index}" + "|"
                 else:
-                    line += (" " * cell_width) + "|"
+                    line += (" " * (cell_width-3)) +f"{index},{cell_index}"+ "|"
             else:
-                line += " " * cell_width + "|"
+                line += (" " * (cell_width-3)) +f"{index},{cell_index}"+ "|"
         print(line)
         # Print the horizontal separator after each row
         print(horizontal_separator)
@@ -333,39 +330,44 @@ def create_standard_board() -> List[List[Cell]]:
 
 def place_cities(board):
     # Call the function with the board
-    print_board(board)
-    player_1_city = input("Player 1, enter city coordinates in format row, column: ")
-    p1_city_row = int(player_1_city.split(",")[0])
-    p1_city_column = int(player_1_city.split(",")[1])
-    if p1_city_row < 6 or p1_city_row > 8 or p1_city_column < 0 or p1_city_column > 8:
-        print("Invalid city placement, city should be built on the last 3 rows. Exiting...")
-        raise SystemExit
+    print_player_view(board, 1)
+    while True:
+        player_1_city = input("Player 1, enter city coordinates in format row, column: ")
+        p1_city_row = int(player_1_city.split(",")[0])
+        p1_city_column = int(player_1_city.split(",")[1])
+        if p1_city_row < 6 or p1_city_row > 8 or p1_city_column < 0 or p1_city_column > 8:
+            print("Invalid city placement, city should be built on the last 3 rows")
+            continue
 
-    cell = board[p1_city_row][p1_city_column]
-    if cell.type != "plain":
-        print("Invalid coordinates, city should be built on a plain. Exiting...")
-        raise SystemExit
+        cell = board[p1_city_row][p1_city_column]
+        if cell.type != "plain":
+            print("Invalid coordinates, city should be built on a plain")
+            continue
 
-    cell.city = 1
+        cell.city = 1
+        break
     clear_console()
+    input("Give board to player 2, then press enter to continue")
     #print_master_view(board)
     print_player_view(board, 2)
-    player_2_city = input("Player 2, enter city coordinates in format row, column: ")
-    p2_city_row = int(player_2_city.split(",")[0])
-    p2_city_column = int(player_2_city.split(",")[1])
-    if p2_city_row < 6 or p2_city_row > 8 or p2_city_column < 0 or p2_city_column > 8:
-        print("Invalid city placement, city should be built on the last 3 rows. Exiting...")
-        raise SystemExit
+    while True:
+        player_2_city = input("Player 2, enter city coordinates in format row, column: ")
+        p2_city_row = int(player_2_city.split(",")[0])
+        p2_city_column = int(player_2_city.split(",")[1])
+        if p2_city_row < 6 or p2_city_row > 8 or p2_city_column < 0 or p2_city_column > 8:
+            print("Invalid city placement, city should be built on the last 3 rows")
+            continue
 
-    # mirror player 2 city coordinates
-    p2_city_row = 8 - p2_city_row
-    p2_city_column = 8 - p2_city_column
-    cell = board[p2_city_row][p2_city_column]
-    if cell.type != "plain":
-        print("Invalid coordinates, city should be built on a plain. Exiting...")
-        raise SystemExit
+        # mirror player 2 city coordinates
+        p2_city_row = 8 - p2_city_row
+        p2_city_column = 8 - p2_city_column
+        cell = board[p2_city_row][p2_city_column]
+        if cell.type != "plain":
+            print("Invalid coordinates, city should be built on a plain")
+            continue
 
-    cell.city = 2
+        cell.city = 2
+        break
 
 def place_units(board):
     print_player_view(board, 1)
@@ -386,6 +388,7 @@ def place_units(board):
             print_player_view(board, 1)
             break
     clear_console()
+    input("Give board to player 2, then press enter to continue")
     print_player_view(board, 2)
     for i in range(7):
         while True:
@@ -438,28 +441,25 @@ def player_turn(board: List[List[Cell]], player: int):
 
 if __name__ == "__main__":
     board = create_standard_board()
-    # place test cities
-    board[6][4].city = 1
-    board[2][4].city = 2
-    # place test units
-    add_unit(board, Unit(1), 7, 4)
-    add_unit(board, Unit(1), 7, 5)
-    add_unit(board, Unit(1), 7, 6)
-    add_unit(board, Unit(1), 8, 4)
-    add_unit(board, Unit(1), 8, 5)
-    add_unit(board, Unit(1), 8, 6)
-    add_unit(board, Unit(1), 8, 7)
-    add_unit(board, Unit(2), 1, 4)
-    add_unit(board, Unit(2), 1, 5)
-    add_unit(board, Unit(2), 1, 6)
-    add_unit(board, Unit(2), 0, 4)
-    add_unit(board, Unit(2), 0, 5)
-    add_unit(board, Unit(2), 0, 6)
-    add_unit(board, Unit(2), 0, 7)
-    while True:
+    place_cities(board)
+    clear_console()
+    input("Give board to other player, then press enter to continue")
+    place_units(board)
+    clear_console()
+    input("Give board to other player, then press enter to continue")
+    winner = None
+    while winner is None:
         player_turn(board, 1)
+        clear_console()
+        input("Give board to other player, then press enter to continue")
         player_turn(board, 2)
         resolve_units(board)
         winner = check_for_winner(board)
+        clear_console()
+        input("Give board to other player, then press enter to continue")
+    if winner == 3:
+        print("Game ended in a draw")
+    else:
+        print(f"Player {winner} wins!")
 
         
