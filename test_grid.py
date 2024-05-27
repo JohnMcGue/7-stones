@@ -165,3 +165,8 @@ def test_draw(board):
 def test_game_not_over(board):
     winner = grid.check_for_winner(board)
     assert winner is None
+
+def test_uncontrolled_city_does_not_end_game(board):
+    board[6][6].city = 1
+    winner = grid.check_for_winner(board)
+    assert winner is None
