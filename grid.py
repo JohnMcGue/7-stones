@@ -9,6 +9,7 @@ class Cell():
         self.type = "plain"
         self.city = None
         self.units = []
+        self.provisional_units = []
         self.visible = True
         self.uuid = uuid.uuid4()
 
@@ -109,35 +110,43 @@ def get_unit_cell(board: List[List[Cell]], unit: Unit):
                 return cell
     return None
 
-def add_unit(board: List[List[Cell]], unit: Unit, row: int, column: int):
-    if row < 0 or row > 8 or column < 0 or column > 8:
-        print("Invalid unit placement, unit cannot be added off grid.")
-        raise ValueError("Unit cannot be placed outside the board")
-    cell = board[row][column]
+def add_unit(board: List[List[Cell]], unit: Unit, cell: Cell):
     if cell.type == "lake" or cell.type == "mountain":
         print("Invalid coordinates, unit cannot be placed on lake.")
-        raise ValueError("Unit cannot be placed on lake or mountain")
+        raise ValueError("Player already has 7 units on the board")
     player = unit.player
     player_units = get_player_units(board, player)
     if len(player_units) == 7:
         raise ValueError("Player already has 7 units on the board")
     cell.units.append(unit)
 
-def move_unit(board: List[List[Cell]], unit: Unit, end_row: int, end_column: int):
+def validate_unit_move(board: List[List[Cell]], unit: Unit, target_cell: Cell):
     starting_cell = get_unit_cell(board, unit)
     if not starting_cell:
         print("Unit not found on board")
-        raise ValueError("Unit not found on board")
+        return False
+    if target_cell.type == "lake" or target_cell.type == "mountain":
+        print("Invalid coordinates, unit cannot be placed on lake.")
+        return False
     starting_row, starting_column = get_cell_position(board, starting_cell)
+    end_row, end_column = get_cell_position(board, target_cell)
     if abs(starting_row - end_row) +  abs(starting_column - end_column) > unit.movement:
         print("Unit cannot move that far")
-        raise ValueError("Unit cannot move that far")
-    starting_cell.units.remove(unit)
-    try:
-        add_unit(board, unit, end_row, end_column)
-    except Exception as e:
-        add_unit(board, unit, starting_row, starting_column)
-        raise e
+        return False
+    return True
+
+
+def move_unit(board: List[List[Cell]], unit: Unit, target_cell: Cell):
+    if validate_unit_move(board, unit, target_cell):
+        starting_cell = get_unit_cell(board, unit)
+        starting_cell.units.remove(unit)
+        try:
+            add_unit(board, unit, target_cell)
+        except Exception as e:
+            add_unit(board, unit, starting_cell)
+            raise e
+    else:
+        raise ValueError("Invalid move")
 
 def remove_unit(board: List[List[Cell]], unit: Unit):
     cell = get_unit_cell(board, unit)
@@ -229,6 +238,10 @@ def print_board(board: List[List[Cell]]):
     # Print the top border
     print(horizontal_separator)
 
+    for row in board:
+        for cell in row:
+            cell.all_units = cell.units + cell.provisional_units
+
     # Print each row
     for index,row in enumerate(board):
         line = "|"
@@ -237,7 +250,9 @@ def print_board(board: List[List[Cell]]):
                 if len(cell.units) > 6:
                     number_of_player_1_units = len([unit for unit in cell.units if unit.player == 1])
                     if number_of_player_1_units > 0:
-                        line += f"1x{number_of_player_1_units})"
+                        line += f"1x{number_of_player_1_units}"
+                    else:
+                        line += "   "
                 elif len(cell.units) > 0:
                     unit = cell.units[0]
                     line += f"({unit.player})"
@@ -257,7 +272,9 @@ def print_board(board: List[List[Cell]]):
                 if len(cell.units) > 6:
                     number_of_player_2_units = len([unit for unit in cell.units if unit.player == 2])
                     if number_of_player_2_units > 0:
-                        line += f"2x{number_of_player_2_units})"
+                        line += f"2x{number_of_player_2_units}"
+                    else:
+                        line += "   "
                 elif len(cell.units) > 1:
                     unit = cell.units[1]
                     line += f"({unit.player})"
@@ -309,7 +326,7 @@ def print_board(board: List[List[Cell]]):
                     unit = cell.units[5]
                     line += f"({unit.player})"
                 else:
-                    line += (" " * (cell_width-3))
+                    line += (" " * 3)
             else:
                 line += (" " * (cell_width-3)) 
             line += f"{index},{cell_index}"+ "|"
@@ -439,12 +456,13 @@ def player_turn(board: List[List[Cell]], player: int):
             if player == 2:
                 end_row = 8 - end_row
                 end_column = 8 - end_column
-            try:
-                move_unit(board, unit, end_row, end_column)
-            except:
+            target_cell = board[end_row][end_column]
+            if validate_unit_move(board, unit, target_cell):
+                target_cell.provisional_units.append(unit)
+                break
+            else:
                 print("Invalid move, please try again.")
                 continue
-            break
         clear_console()
         print_player_view(board, player)
 
@@ -464,6 +482,11 @@ if __name__ == "__main__":
         player_turn(board, 1)
         switch_players()
         player_turn(board, 2)
+        for row in board:
+            for cell in row:
+                for unit in cell.provisional_units:
+                    move_unit(board, unit, cell)
+                    cell.provisional_units.remove(unit)
         resolve_units(board)
         winner = check_for_winner(board)
         switch_players()
