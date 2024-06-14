@@ -9,7 +9,6 @@ class Cell():
         self.type = "plain"
         self.city = None
         self.units = []
-        self.provisional_units = []
         self.visible = True
         self.uuid = uuid.uuid4()
 
@@ -238,27 +237,21 @@ def print_board(board: List[List[Cell]]):
     # Print the top border
     print(horizontal_separator)
 
-    for row in board:
-        for cell in row:
-            cell.all_units = cell.units + cell.provisional_units
-
     # Print each row
     for index,row in enumerate(board):
         line = "|"
         for cell in row:
             if cell.visible:
-                if len(cell.all_units) > 6:
-                    number_of_player_1_units = len([unit for unit in cell.all_units if unit.player == 1])
+                if len(cell.units) > 6:
+                    number_of_player_1_units = len([unit for unit in cell.units if unit.player == 1])
                     if number_of_player_1_units > 0:
                         line += f"1x{number_of_player_1_units}"
                     else:
                         line += "   "
-                elif len(cell.all_units) > 0:
-                    unit = cell.all_units[0]
+                elif len(cell.units) > 0:
+                    unit = cell.units[0]
                     if unit in cell.units:
                         line += f"({unit.player})"
-                    elif unit in cell.provisional_units:
-                        line += f"{{{unit.player}}}"
                 else:
                     line += "   "
                 if cell.type == "mountain" or cell.type == "lake":
@@ -272,41 +265,29 @@ def print_board(board: List[List[Cell]]):
                             line += f"{control_value} "
                         else:
                             line += f" {control_value} "
-                if len(cell.all_units) > 6:
-                    number_of_player_2_units = len([unit for unit in cell.all_units if unit.player == 2])
+                if len(cell.units) > 6:
+                    number_of_player_2_units = len([unit for unit in cell.units if unit.player == 2])
                     if number_of_player_2_units > 0:
                         line += f"2x{number_of_player_2_units}"
                     else:
                         line += "   "
-                elif len(cell.all_units) > 1:
-                    unit = cell.all_units[1]
+                elif len(cell.units) > 1:
+                    unit = cell.units[1]
                     if unit in cell.units:
                         line += f"({unit.player})"
-                    elif unit in cell.provisional_units:
-                        line += f"{{{unit.player}}}"
                 else:
                     line += ("   ")
                 line += "|"
-            elif len(cell.provisional_units) > 0:
-                line += f"{{{cell.provisional_units[0].player}}}   "
-                if len(cell.provisional_units) > 1:
-                    line += f"{{{cell.provisional_units[1].player}}}"+ "|"
-                else:
-                    line += "   "+ "|"
             else:
                 line += " " * cell_width + "|"
         print(line)
         line = "|"
         for cell in row:
             new_line = ""
-            if cell.visible and len(cell.all_units) > 2 and len(cell.all_units) < 7:
-                unit = cell.all_units[2]
+            if cell.visible and len(cell.units) > 2 and len(cell.units) < 7:
+                unit = cell.units[2]
                 if unit in cell.units:
                     new_line += f"({unit.player})"
-                elif unit in cell.provisional_units:
-                    new_line += f"{{{unit.player}}}"
-            elif len(cell.provisional_units) > 2 and len(cell.all_units) < 7:
-                line += f"{{{cell.provisional_units[2].player}}}"
             else:
                 new_line = " " * 3
             # Check if the current cell is the middle cell for the "mountain"
@@ -322,15 +303,10 @@ def print_board(board: List[List[Cell]]):
                 else:
                     cell_content = " " * 3
             
-            if cell.visible and len(cell.all_units) > 3 and len(cell.all_units) < 7:
-                unit = cell.all_units[3]
+            if cell.visible and len(cell.units) > 3 and len(cell.units) < 7:
+                unit = cell.units[3]
                 if unit in cell.units:
                     cell_content += f"({unit.player})"
-                elif unit in cell.provisional_units:
-                    cell_content += f"{{{unit.player}}}"
-            elif len(cell.provisional_units) > 3 and len(cell.all_units) < 7:
-                unit = cell.provisional_units[3]
-                cell_content += f"{{{unit.player}}}"
             else:
                 cell_content += " " * 3
 
@@ -340,29 +316,18 @@ def print_board(board: List[List[Cell]]):
         line = "|"
         for cell_index,cell in enumerate(row):
             if cell.visible:
-                if len(cell.all_units) > 4 and len(cell.all_units) < 7:
-                    unit = cell.all_units[4]
+                if len(cell.units) > 4 and len(cell.units) < 7:
+                    unit = cell.units[4]
                     if unit in cell.units:
                         line += f"({unit.player})"
-                    elif unit in cell.provisional_units:
-                        line += f"{{{unit.player}}}"
                 else:
                     line += (" " * 3)
-                if len(cell.all_units) > 5 and len(cell.all_units) < 7:
-                    unit = cell.all_units[5]
+                if len(cell.units) > 5 and len(cell.units) < 7:
+                    unit = cell.units[5]
                     if unit in cell.units:
                         line += f"({unit.player})"
-                    elif unit in cell.provisional_units:
-                        line += f"{{{unit.player}}}"
                 else:
                     line += (" " * 3)
-            elif len(cell.provisional_units) > 4 and len(cell.all_units) < 7:
-                line += f"{{{cell.provisional_units[4].player}}}"
-                if len(cell.provisional_units) > 5 and len(cell.all_units) < 7:
-                    line += f"{{{cell.provisional_units[5].player}}}"
-                else:
-                    line += "   "
-                line += "|"
             else:
                 line += (" " * (cell_width-3)) 
             line += f"{index},{cell_index}"+ "|"
@@ -375,7 +340,6 @@ def print_player_view(board, player):
     for row in board_copy:
         for cell in row:
             cell.visible = get_cell_visibility(board_copy, cell, player)
-            cell.provisional_units = [unit for unit in cell.provisional_units if unit.player == player]
     if player == 2:
         #mirror the board
         for row in board_copy:
@@ -476,14 +440,21 @@ def place_units(board):
     print_player_view(board, 2)
     place_player_units(board, 2)
 
-def player_turn(board: List[List[Cell]], player: int):
+def get_player_moves(board: List[List[Cell]], player: int) -> list[tuple[Unit, Cell]]:
     clear_console()
     print_player_view(board, player)
     units = get_player_units(board, player)
     if player == 2:
         units.reverse()
+    player_moves = []
     for unit in units:
         while True:
+            for player_move in player_moves:
+                for unit, target_cell in player_move:
+                    unit_cell = get_unit_cell(board, unit)
+                    unit_cell_row, unit_cell_col = get_cell_position(board, unit_cell)
+                    target_cell_row, target_cell_col = get_cell_position(board, cell)
+                    print(f"Moving unit from {unit_cell_row}, {unit_cell_col} to {target_cell_row}, {target_cell_col}")
             row,column = get_unit_position(board, unit)
             if player == 2:
                 row = 8 - row
@@ -497,13 +468,14 @@ def player_turn(board: List[List[Cell]], player: int):
                 end_column = 8 - end_column
             target_cell = board[end_row][end_column]
             if validate_unit_move(board, unit, target_cell):
-                target_cell.provisional_units.append(unit)
+                player_moves.append((unit, target_cell))
                 break
             else:
                 print("Invalid move, please try again.")
                 continue
         clear_console()
         print_player_view(board, player)
+    return player_moves
 
 def switch_players():
     clear_console()
@@ -518,18 +490,13 @@ if __name__ == "__main__":
     switch_players()
     winner = None
     while winner is None:
-        player_turn(board, 1)
+        player_moves = []
+        player_moves.append(get_player_moves(board, 1))
         switch_players()
-        player_turn(board, 2)
-        for row in board:
-            for cell in row:
-                for unit in cell.provisional_units:
-                    unit_cell = get_unit_cell(board, unit)
-                    unit_cell_row, unit_cell_col = get_cell_position(board, unit_cell)
-                    target_cell_row, target_cell_col = get_cell_position(board, cell)
-                    print(f"Moving unit from {unit_cell_row}, {unit_cell_col} to {target_cell_row}, {target_cell_col}")
-                    move_unit(board, unit, cell)
-                    cell.provisional_units.remove(unit)
+        player_moves.append(get_player_moves(board, 2))
+        for player_move in player_moves:
+            for unit, target_cell in player_move:
+                move_unit(board, unit, target_cell)
         resolve_units(board)
         winner = check_for_winner(board)
         break
