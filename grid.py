@@ -450,19 +450,24 @@ def get_player_moves(board: List[List[Cell]], player: int) -> list[tuple[Unit, C
     for unit in units:
         while True:
             for player_move in player_moves:
-                for unit, target_cell in player_move:
-                    unit_cell = get_unit_cell(board, unit)
-                    unit_cell_row, unit_cell_col = get_cell_position(board, unit_cell)
-                    target_cell_row, target_cell_col = get_cell_position(board, cell)
-                    print(f"Moving unit from {unit_cell_row}, {unit_cell_col} to {target_cell_row}, {target_cell_col}")
+                (old_unit, target_cell) = player_move
+                unit_cell = get_unit_cell(board, old_unit)
+                unit_cell_row, unit_cell_col = get_cell_position(board, unit_cell)
+                target_cell_row, target_cell_col = get_cell_position(board, target_cell)
+                if player == 2:
+                    unit_cell_row = 8 - unit_cell_row
+                    unit_cell_col = 8 - unit_cell_col
+                    target_cell_row = 8 - target_cell_row
+                    target_cell_col = 8 - target_cell_col
+                print(f"Moving unit from {unit_cell_row}, {unit_cell_col} to {target_cell_row}, {target_cell_col}")
             row,column = get_unit_position(board, unit)
             if player == 2:
                 row = 8 - row
                 column = 8 - column
-            player_move = input(f"{player}, Enter move for unit at {row}, {column} in format row, column, or enter to skip:")
-            if not player_move:
+            input_string = input(f"{player}, Enter move for unit at {row}, {column} in format row, column, or enter to skip:")
+            if not input_string:
                 break
-            end_row, end_column = validate_user_input_coordinates(player_move)
+            end_row, end_column = validate_user_input_coordinates(input_string)
             if player == 2:
                 end_row = 8 - end_row
                 end_column = 8 - end_column
@@ -482,24 +487,31 @@ def switch_players():
     input("Give board to other player, then press enter to continue")
     clear_console()
 
+def place_starter_units(board: List[List[Cell]]):
+    board[7][1].city = 1
+    board[1][7].city = 2
+    for i in range(7):
+        add_unit(board, Unit(1), board[8][i])
+        add_unit(board, Unit(2), board[0][8-i])
+
 if __name__ == "__main__":
     board = create_standard_board()
-    place_cities(board)
-    switch_players()
-    place_units(board)
-    switch_players()
+    # place_cities(board)
+    # switch_players()
+    # place_units(board)
+    # switch_players()
+    place_starter_units(board)
     winner = None
     while winner is None:
         player_moves = []
-        player_moves.append(get_player_moves(board, 1))
+        player_moves.extend(get_player_moves(board, 1))
         switch_players()
-        player_moves.append(get_player_moves(board, 2))
+        player_moves.extend(get_player_moves(board, 2))
         for player_move in player_moves:
-            for unit, target_cell in player_move:
-                move_unit(board, unit, target_cell)
+            (unit, target_cell) = player_move
+            move_unit(board, unit, target_cell)
         resolve_units(board)
         winner = check_for_winner(board)
-        break
         switch_players()
     if winner == 3:
         print("Game ended in a draw")
